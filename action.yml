@@ -1,0 +1,39 @@
+name: 'GitHub JSON Bourne'
+description: 'Fetch GitHub profile data (contributions, heatmap, streak, activity, repos) as clean JSON'
+author: 'ggfevans'
+
+branding:
+  icon: 'activity'
+  color: 'purple'
+
+inputs:
+  username:
+    description: 'GitHub username to fetch data for'
+    required: false
+    default: '${{ github.repository_owner }}'
+  token:
+    description: 'GitHub token (PAT for private contributions, or GITHUB_TOKEN for public only)'
+    required: false
+    default: '${{ github.token }}'
+  output-path:
+    description: 'Path to write the JSON output file'
+    required: false
+    default: 'github.json'
+  max-repos:
+    description: 'Maximum number of repositories to include'
+    required: false
+    default: '12'
+  max-activities:
+    description: 'Maximum number of recent activities to include'
+    required: false
+    default: '30'
+
+outputs:
+  json-path:
+    description: 'Path to the generated JSON file'
+  last-updated:
+    description: 'ISO timestamp of when data was fetched'
+
+runs:
+  using: 'node20'
+  main: 'dist/index.js'
