@@ -27,6 +27,10 @@ inputs:
     description: 'Maximum number of recent activities to include'
     required: false
     default: '30'
+  max-pages:
+    description: 'Maximum event pages to scan when collecting recent activity'
+    required: false
+    default: '3'
 
 outputs:
   json-path:

@@ -7,6 +7,7 @@ import { fetchRepos } from './repos.js';
 import { calculateStreak } from './streak.js';
 import { calculateStats } from './stats.js';
 import { validate } from './schema.js';
+import { parsePositiveInt } from './inputs.js';
 
 const EMPTY_CONTRIBUTIONS = {
   total: 0,
@@ -19,21 +20,13 @@ const EMPTY_CONTRIBUTIONS = {
 
 const EMPTY_CALENDAR = { weeks: [] };
 
-function parsePositiveIntInput(name) {
-  const raw = core.getInput(name);
-  const value = Number.parseInt(raw, 10);
-  if (!Number.isInteger(value) || value <= 0) {
-    throw new Error(`Input "${name}" must be a positive integer. Received: ${raw}`);
-  }
-  return value;
-}
-
 export async function run() {
   const username = core.getInput('username') || process.env.GITHUB_REPOSITORY_OWNER;
   const token = core.getInput('token') || process.env.GITHUB_TOKEN || process.env.GH_TOKEN;
   const outputPath = core.getInput('output-path') || 'github.json';
-  const maxRepos = parsePositiveIntInput('max-repos');
-  const maxActivities = parsePositiveIntInput('max-activities');
+  const maxRepos = parsePositiveInt(core.getInput('max-repos'), 'max-repos');
+  const maxActivities = parsePositiveInt(core.getInput('max-activities'), 'max-activities');
+  const maxPages = parsePositiveInt(core.getInput('max-pages'), 'max-pages');
 
   if (!username) {
     throw new Error('A GitHub username is required.');
@@ -46,8 +39,10 @@ export async function run() {
   core.info(`Fetching GitHub data for ${username}`);
   const [contributionsResult, activityResult, reposResult] = await Promise.allSettled([
     fetchContributions(username, token),
-    fetchActivity(username, token, maxActivities),
-    fetchRepos(username, token, maxRepos),
+    fetchActivity(username, token, maxActivities, { maxPages }),
+    fetchRepos(username, token, maxRepos, {
+      onWarning: (message) => core.warning(message),
+    }),
   ]);
 
   const { contributions, calendar } =
