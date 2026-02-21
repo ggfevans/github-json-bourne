@@ -20,13 +20,32 @@ const EMPTY_CONTRIBUTIONS = {
 
 const EMPTY_CALENDAR = { weeks: [] };
 
-export async function run() {
-  const username = core.getInput('username') || process.env.GITHUB_REPOSITORY_OWNER;
-  const token = core.getInput('token') || process.env.GITHUB_TOKEN || process.env.GH_TOKEN;
-  const outputPath = core.getInput('output-path') || 'github.json';
-  const maxRepos = parsePositiveInt(core.getInput('max-repos'), 'max-repos');
-  const maxActivities = parsePositiveInt(core.getInput('max-activities'), 'max-activities');
-  const maxPages = parsePositiveInt(core.getInput('max-pages'), 'max-pages');
+const DEFAULT_DEPS = {
+  core,
+  fs,
+  path,
+  fetchContributions,
+  fetchActivity,
+  fetchRepos,
+  calculateStreak,
+  calculateStats,
+  validate,
+  parsePositiveInt,
+};
+
+export async function run(overrides = {}) {
+  const deps = {
+    ...DEFAULT_DEPS,
+    ...overrides,
+  };
+
+  const coreApi = deps.core;
+  const username = coreApi.getInput('username') || process.env.GITHUB_REPOSITORY_OWNER;
+  const token = coreApi.getInput('token') || process.env.GITHUB_TOKEN || process.env.GH_TOKEN;
+  const outputPath = coreApi.getInput('output-path') || 'github.json';
+  const maxRepos = deps.parsePositiveInt(coreApi.getInput('max-repos'), 'max-repos');
+  const maxActivities = deps.parsePositiveInt(coreApi.getInput('max-activities'), 'max-activities');
+  const maxPages = deps.parsePositiveInt(coreApi.getInput('max-pages'), 'max-pages');
 
   if (!username) {
     throw new Error('A GitHub username is required.');
@@ -36,12 +55,12 @@ export async function run() {
     throw new Error('A GitHub token is required.');
   }
 
-  core.info(`Fetching GitHub data for ${username}`);
+  coreApi.info(`Fetching GitHub data for ${username}`);
   const [contributionsResult, activityResult, reposResult] = await Promise.allSettled([
-    fetchContributions(username, token),
-    fetchActivity(username, token, maxActivities, { maxPages }),
-    fetchRepos(username, token, maxRepos, {
-      onWarning: (message) => core.warning(message),
+    deps.fetchContributions(username, token),
+    deps.fetchActivity(username, token, maxActivities, { maxPages }),
+    deps.fetchRepos(username, token, maxRepos, {
+      onWarning: (message) => coreApi.warning(message),
     }),
   ]);
 
@@ -50,7 +69,7 @@ export async function run() {
       ? contributionsResult.value
       : { contributions: EMPTY_CONTRIBUTIONS, calendar: EMPTY_CALENDAR };
   if (contributionsResult.status === 'rejected') {
-    core.warning(`Contributions fetch failed; using empty contributions. ${contributionsResult.reason?.message ?? contributionsResult.reason}`);
+    coreApi.warning(`Contributions fetch failed; using empty contributions. ${contributionsResult.reason?.message ?? contributionsResult.reason}`);
   }
 
   const recentActivity =
@@ -58,7 +77,7 @@ export async function run() {
       ? activityResult.value
       : [];
   if (activityResult.status === 'rejected') {
-    core.warning(`Activity fetch failed; using empty activity list. ${activityResult.reason?.message ?? activityResult.reason}`);
+    coreApi.warning(`Activity fetch failed; using empty activity list. ${activityResult.reason?.message ?? activityResult.reason}`);
   }
 
   const repositories =
@@ -66,11 +85,11 @@ export async function run() {
       ? reposResult.value
       : [];
   if (reposResult.status === 'rejected') {
-    core.warning(`Repository fetch failed; using empty repositories list. ${reposResult.reason?.message ?? reposResult.reason}`);
+    coreApi.warning(`Repository fetch failed; using empty repositories list. ${reposResult.reason?.message ?? reposResult.reason}`);
   }
 
-  const streak = calculateStreak(calendar);
-  const stats = calculateStats(calendar, recentActivity);
+  const streak = deps.calculateStreak(calendar);
+  const stats = deps.calculateStats(calendar, recentActivity);
 
   const data = {
     lastUpdated: new Date().toISOString(),
@@ -82,21 +101,23 @@ export async function run() {
     repositories,
   };
 
-  validate(data);
+  deps.validate(data);
 
-  const outputDir = path.dirname(outputPath);
+  const outputDir = deps.path.dirname(outputPath);
   if (outputDir !== '.') {
-    fs.mkdirSync(outputDir, { recursive: true });
+    deps.fs.mkdirSync(outputDir, { recursive: true });
   }
 
-  fs.writeFileSync(outputPath, `${JSON.stringify(data, null, 2)}\n`, 'utf8');
+  deps.fs.writeFileSync(outputPath, `${JSON.stringify(data, null, 2)}\n`, 'utf8');
 
-  core.setOutput('json-path', outputPath);
-  core.setOutput('last-updated', data.lastUpdated);
-  core.info(`Wrote ${outputPath} (${recentActivity.length} activities, ${repositories.length} repositories)`);
+  coreApi.setOutput('json-path', outputPath);
+  coreApi.setOutput('last-updated', data.lastUpdated);
+  coreApi.info(`Wrote ${outputPath} (${recentActivity.length} activities, ${repositories.length} repositories)`);
 }
 
-run().catch((error) => {
-  const message = error instanceof Error ? error.message : String(error);
-  core.setFailed(message);
-});
+if (process.env.GITHUB_JSON_BOURNE_DISABLE_AUTORUN !== '1') {
+  run().catch((error) => {
+    const message = error instanceof Error ? error.message : String(error);
+    core.setFailed(message);
+  });
+}

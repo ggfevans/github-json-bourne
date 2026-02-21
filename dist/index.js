@@ -27595,6 +27595,36 @@ __webpack_unused_export__ = defaultContentType
 /******/ }
 /******/ 
 /************************************************************************/
+/******/ /* webpack/runtime/create fake namespace object */
+/******/ (() => {
+/******/ 	var getProto = Object.getPrototypeOf ? (obj) => (Object.getPrototypeOf(obj)) : (obj) => (obj.__proto__);
+/******/ 	var leafPrototypes;
+/******/ 	// create a fake namespace object
+/******/ 	// mode & 1: value is a module id, require it
+/******/ 	// mode & 2: merge all properties of value into the ns
+/******/ 	// mode & 4: return value when already ns object
+/******/ 	// mode & 16: return value when it's Promise-like
+/******/ 	// mode & 8|1: behave like require
+/******/ 	__nccwpck_require__.t = function(value, mode) {
+/******/ 		if(mode & 1) value = this(value);
+/******/ 		if(mode & 8) return value;
+/******/ 		if(typeof value === 'object' && value) {
+/******/ 			if((mode & 4) && value.__esModule) return value;
+/******/ 			if((mode & 16) && typeof value.then === 'function') return value;
+/******/ 		}
+/******/ 		var ns = Object.create(null);
+/******/ 		__nccwpck_require__.r(ns);
+/******/ 		var def = {};
+/******/ 		leafPrototypes = leafPrototypes || [null, getProto({}), getProto([]), getProto(getProto)];
+/******/ 		for(var current = mode & 2 && value; typeof current == 'object' && !~leafPrototypes.indexOf(current); current = getProto(current)) {
+/******/ 			Object.getOwnPropertyNames(current).forEach((key) => (def[key] = () => (value[key])));
+/******/ 		}
+/******/ 		def['default'] = () => (value);
+/******/ 		__nccwpck_require__.d(ns, def);
+/******/ 		return ns;
+/******/ 	};
+/******/ })();
+/******/ 
 /******/ /* webpack/runtime/define property getters */
 /******/ (() => {
 /******/ 	// define getter functions for harmony exports
@@ -27612,6 +27642,17 @@ __webpack_unused_export__ = defaultContentType
 /******/ 	__nccwpck_require__.o = (obj, prop) => (Object.prototype.hasOwnProperty.call(obj, prop))
 /******/ })();
 /******/ 
+/******/ /* webpack/runtime/make namespace object */
+/******/ (() => {
+/******/ 	// define __esModule on exports
+/******/ 	__nccwpck_require__.r = (exports) => {
+/******/ 		if(typeof Symbol !== 'undefined' && Symbol.toStringTag) {
+/******/ 			Object.defineProperty(exports, Symbol.toStringTag, { value: 'Module' });
+/******/ 		}
+/******/ 		Object.defineProperty(exports, '__esModule', { value: true });
+/******/ 	};
+/******/ })();
+/******/ 
 /******/ /* webpack/runtime/compat */
 /******/ 
 /******/ if (typeof __nccwpck_require__ !== 'undefined') __nccwpck_require__.ab = new URL('.', import.meta.url).pathname.slice(import.meta.url.match(/^file:\/\/\/\w:/) ? 1 : 0, -1) + "/";
@@ -27626,6 +27667,7 @@ __nccwpck_require__.d(__webpack_exports__, {
 
 // EXTERNAL MODULE: ./node_modules/@actions/core/lib/core.js
 var core = __nccwpck_require__(7484);
+var core_namespaceObject = /*#__PURE__*/__nccwpck_require__.t(core, 2);
 ;// CONCATENATED MODULE: external "node:fs"
 const external_node_fs_namespaceObject = __WEBPACK_EXTERNAL_createRequire(import.meta.url)("node:fs");
 ;// CONCATENATED MODULE: external "node:path"
@@ -32381,13 +32423,32 @@ const EMPTY_CONTRIBUTIONS = {
 
 const EMPTY_CALENDAR = { weeks: [] };
 
-async function run() {
-  const username = core.getInput('username') || process.env.GITHUB_REPOSITORY_OWNER;
-  const token = core.getInput('token') || process.env.GITHUB_TOKEN || process.env.GH_TOKEN;
-  const outputPath = core.getInput('output-path') || 'github.json';
-  const maxRepos = parsePositiveInt(core.getInput('max-repos'), 'max-repos');
-  const maxActivities = parsePositiveInt(core.getInput('max-activities'), 'max-activities');
-  const maxPages = parsePositiveInt(core.getInput('max-pages'), 'max-pages');
+const DEFAULT_DEPS = {
+  core: core_namespaceObject,
+  fs: external_node_fs_namespaceObject,
+  path: external_node_path_namespaceObject,
+  fetchContributions: fetchContributions,
+  fetchActivity: fetchActivity,
+  fetchRepos: fetchRepos,
+  calculateStreak: calculateStreak,
+  calculateStats: calculateStats,
+  validate: validate,
+  parsePositiveInt: parsePositiveInt,
+};
+
+async function run(overrides = {}) {
+  const deps = {
+    ...DEFAULT_DEPS,
+    ...overrides,
+  };
+
+  const coreApi = deps.core;
+  const username = coreApi.getInput('username') || process.env.GITHUB_REPOSITORY_OWNER;
+  const token = coreApi.getInput('token') || process.env.GITHUB_TOKEN || process.env.GH_TOKEN;
+  const outputPath = coreApi.getInput('output-path') || 'github.json';
+  const maxRepos = deps.parsePositiveInt(coreApi.getInput('max-repos'), 'max-repos');
+  const maxActivities = deps.parsePositiveInt(coreApi.getInput('max-activities'), 'max-activities');
+  const maxPages = deps.parsePositiveInt(coreApi.getInput('max-pages'), 'max-pages');
 
   if (!username) {
     throw new Error('A GitHub username is required.');
@@ -32397,12 +32458,12 @@ async function run() {
     throw new Error('A GitHub token is required.');
   }
 
-  core.info(`Fetching GitHub data for ${username}`);
+  coreApi.info(`Fetching GitHub data for ${username}`);
   const [contributionsResult, activityResult, reposResult] = await Promise.allSettled([
-    fetchContributions(username, token),
-    fetchActivity(username, token, maxActivities, { maxPages }),
-    fetchRepos(username, token, maxRepos, {
-      onWarning: (message) => core.warning(message),
+    deps.fetchContributions(username, token),
+    deps.fetchActivity(username, token, maxActivities, { maxPages }),
+    deps.fetchRepos(username, token, maxRepos, {
+      onWarning: (message) => coreApi.warning(message),
     }),
   ]);
 
@@ -32411,7 +32472,7 @@ async function run() {
       ? contributionsResult.value
       : { contributions: EMPTY_CONTRIBUTIONS, calendar: EMPTY_CALENDAR };
   if (contributionsResult.status === 'rejected') {
-    core.warning(`Contributions fetch failed; using empty contributions. ${contributionsResult.reason?.message ?? contributionsResult.reason}`);
+    coreApi.warning(`Contributions fetch failed; using empty contributions. ${contributionsResult.reason?.message ?? contributionsResult.reason}`);
   }
 
   const recentActivity =
@@ -32419,7 +32480,7 @@ async function run() {
       ? activityResult.value
       : [];
   if (activityResult.status === 'rejected') {
-    core.warning(`Activity fetch failed; using empty activity list. ${activityResult.reason?.message ?? activityResult.reason}`);
+    coreApi.warning(`Activity fetch failed; using empty activity list. ${activityResult.reason?.message ?? activityResult.reason}`);
   }
 
   const repositories =
@@ -32427,11 +32488,11 @@ async function run() {
       ? reposResult.value
       : [];
   if (reposResult.status === 'rejected') {
-    core.warning(`Repository fetch failed; using empty repositories list. ${reposResult.reason?.message ?? reposResult.reason}`);
+    coreApi.warning(`Repository fetch failed; using empty repositories list. ${reposResult.reason?.message ?? reposResult.reason}`);
   }
 
-  const streak = calculateStreak(calendar);
-  const stats = calculateStats(calendar, recentActivity);
+  const streak = deps.calculateStreak(calendar);
+  const stats = deps.calculateStats(calendar, recentActivity);
 
   const data = {
     lastUpdated: new Date().toISOString(),
@@ -32443,24 +32504,26 @@ async function run() {
     repositories,
   };
 
-  validate(data);
+  deps.validate(data);
 
-  const outputDir = external_node_path_namespaceObject.dirname(outputPath);
+  const outputDir = deps.path.dirname(outputPath);
   if (outputDir !== '.') {
-    external_node_fs_namespaceObject.mkdirSync(outputDir, { recursive: true });
+    deps.fs.mkdirSync(outputDir, { recursive: true });
   }
 
-  external_node_fs_namespaceObject.writeFileSync(outputPath, `${JSON.stringify(data, null, 2)}\n`, 'utf8');
+  deps.fs.writeFileSync(outputPath, `${JSON.stringify(data, null, 2)}\n`, 'utf8');
 
-  core.setOutput('json-path', outputPath);
-  core.setOutput('last-updated', data.lastUpdated);
-  core.info(`Wrote ${outputPath} (${recentActivity.length} activities, ${repositories.length} repositories)`);
+  coreApi.setOutput('json-path', outputPath);
+  coreApi.setOutput('last-updated', data.lastUpdated);
+  coreApi.info(`Wrote ${outputPath} (${recentActivity.length} activities, ${repositories.length} repositories)`);
 }
 
-run().catch((error) => {
-  const message = error instanceof Error ? error.message : String(error);
-  core.setFailed(message);
-});
+if (process.env.GITHUB_JSON_BOURNE_DISABLE_AUTORUN !== '1') {
+  run().catch((error) => {
+    const message = error instanceof Error ? error.message : String(error);
+    core.setFailed(message);
+  });
+}
 
 var __webpack_exports__run = __webpack_exports__.e;
 export { __webpack_exports__run as run };
