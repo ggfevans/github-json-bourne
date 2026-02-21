@@ -39,12 +39,18 @@ async function fetchPushCommits(octokit, event) {
     date: eventDate,
   }));
 
-  if ((payload.size ?? 0) <= 20) {
-    return itemsFromEvent;
-  }
-
   const [owner, repoName] = repoFull.split('/');
-  if (!owner || !repoName || !payload.before || !payload.head) {
+  const before = String(payload.before ?? '');
+  const head = String(payload.head ?? '');
+  const canCompare =
+    Boolean(owner) &&
+    Boolean(repoName) &&
+    before.length > 0 &&
+    head.length > 0 &&
+    !/^0+$/.test(before) &&
+    !/^0+$/.test(head);
+
+  if (!canCompare) {
     return itemsFromEvent;
   }
 
@@ -52,18 +58,23 @@ async function fetchPushCommits(octokit, event) {
     const response = await octokit.request('GET /repos/{owner}/{repo}/compare/{basehead}', {
       owner,
       repo: repoName,
-      basehead: `${payload.before}...${payload.head}`,
+      basehead: `${before}...${head}`,
       headers: {
         'X-GitHub-Api-Version': '2022-11-28',
       },
     });
 
-    return (response.data.commits ?? []).map((commit) => ({
+    const commits = Array.isArray(response.data.commits) ? response.data.commits : [];
+    if (commits.length === 0) {
+      return itemsFromEvent;
+    }
+
+    return commits.map((commit) => ({
       type: 'commit',
       repo,
       repoUrl: `https://github.com/${repoFull}`,
       title: truncateTitle(commit.commit?.message),
-      url: commit.html_url,
+      url: commit.html_url ?? `https://github.com/${repoFull}/commit/${commit.sha ?? ''}`,
       date:
         commit.commit?.author?.date ??
         commit.commit?.committer?.date ??
@@ -109,8 +120,8 @@ function parseIssueEvents(events) {
     .filter((item) => item.repo && item.repoUrl !== 'https://github.com/' && item.url);
 }
 
-export async function fetchActivity(username, token, maxActivities = 30) {
-  const octokit = new Octokit({ auth: token });
+export async function fetchActivity(username, token, maxActivities = 30, octokitClient = null) {
+  const octokit = octokitClient ?? new Octokit({ auth: token });
 
   const events = [];
   for (let page = 1; page <= 3; page += 1) {

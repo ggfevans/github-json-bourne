@@ -8,6 +8,17 @@ import { calculateStreak } from './streak.js';
 import { calculateStats } from './stats.js';
 import { validate } from './schema.js';
 
+const EMPTY_CONTRIBUTIONS = {
+  total: 0,
+  commits: 0,
+  pullRequests: 0,
+  pullRequestReviews: 0,
+  issues: 0,
+  restricted: 0,
+};
+
+const EMPTY_CALENDAR = { weeks: [] };
+
 function parsePositiveIntInput(name) {
   const raw = core.getInput(name);
   const value = Number.parseInt(raw, 10);
@@ -33,12 +44,35 @@ export async function run() {
   }
 
   core.info(`Fetching GitHub data for ${username}`);
-
-  const [{ contributions, calendar }, recentActivity, repositories] = await Promise.all([
+  const [contributionsResult, activityResult, reposResult] = await Promise.allSettled([
     fetchContributions(username, token),
     fetchActivity(username, token, maxActivities),
     fetchRepos(username, token, maxRepos),
   ]);
+
+  const { contributions, calendar } =
+    contributionsResult.status === 'fulfilled'
+      ? contributionsResult.value
+      : { contributions: EMPTY_CONTRIBUTIONS, calendar: EMPTY_CALENDAR };
+  if (contributionsResult.status === 'rejected') {
+    core.warning(`Contributions fetch failed; using empty contributions. ${contributionsResult.reason?.message ?? contributionsResult.reason}`);
+  }
+
+  const recentActivity =
+    activityResult.status === 'fulfilled'
+      ? activityResult.value
+      : [];
+  if (activityResult.status === 'rejected') {
+    core.warning(`Activity fetch failed; using empty activity list. ${activityResult.reason?.message ?? activityResult.reason}`);
+  }
+
+  const repositories =
+    reposResult.status === 'fulfilled'
+      ? reposResult.value
+      : [];
+  if (reposResult.status === 'rejected') {
+    core.warning(`Repository fetch failed; using empty repositories list. ${reposResult.reason?.message ?? reposResult.reason}`);
+  }
 
   const streak = calculateStreak(calendar);
   const stats = calculateStats(calendar, recentActivity);

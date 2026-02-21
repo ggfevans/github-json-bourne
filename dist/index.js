@@ -31754,12 +31754,18 @@ async function fetchPushCommits(octokit, event) {
     date: eventDate,
   }));
 
-  if ((payload.size ?? 0) <= 20) {
-    return itemsFromEvent;
-  }
-
   const [owner, repoName] = repoFull.split('/');
-  if (!owner || !repoName || !payload.before || !payload.head) {
+  const before = String(payload.before ?? '');
+  const head = String(payload.head ?? '');
+  const canCompare =
+    Boolean(owner) &&
+    Boolean(repoName) &&
+    before.length > 0 &&
+    head.length > 0 &&
+    !/^0+$/.test(before) &&
+    !/^0+$/.test(head);
+
+  if (!canCompare) {
     return itemsFromEvent;
   }
 
@@ -31767,18 +31773,23 @@ async function fetchPushCommits(octokit, event) {
     const response = await octokit.request('GET /repos/{owner}/{repo}/compare/{basehead}', {
       owner,
       repo: repoName,
-      basehead: `${payload.before}...${payload.head}`,
+      basehead: `${before}...${head}`,
       headers: {
         'X-GitHub-Api-Version': '2022-11-28',
       },
     });
 
-    return (response.data.commits ?? []).map((commit) => ({
+    const commits = Array.isArray(response.data.commits) ? response.data.commits : [];
+    if (commits.length === 0) {
+      return itemsFromEvent;
+    }
+
+    return commits.map((commit) => ({
       type: 'commit',
       repo,
       repoUrl: `https://github.com/${repoFull}`,
       title: truncateTitle(commit.commit?.message),
-      url: commit.html_url,
+      url: commit.html_url ?? `https://github.com/${repoFull}/commit/${commit.sha ?? ''}`,
       date:
         commit.commit?.author?.date ??
         commit.commit?.committer?.date ??
@@ -31824,8 +31835,8 @@ function parseIssueEvents(events) {
     .filter((item) => item.repo && item.repoUrl !== 'https://github.com/' && item.url);
 }
 
-async function fetchActivity(username, token, maxActivities = 30) {
-  const octokit = new dist_src_Octokit({ auth: token });
+async function fetchActivity(username, token, maxActivities = 30, octokitClient = null) {
+  const octokit = octokitClient ?? new dist_src_Octokit({ auth: token });
 
   const events = [];
   for (let page = 1; page <= 3; page += 1) {
@@ -32177,6 +32188,17 @@ function validate(data) {
 
 
 
+const EMPTY_CONTRIBUTIONS = {
+  total: 0,
+  commits: 0,
+  pullRequests: 0,
+  pullRequestReviews: 0,
+  issues: 0,
+  restricted: 0,
+};
+
+const EMPTY_CALENDAR = { weeks: [] };
+
 function parsePositiveIntInput(name) {
   const raw = core.getInput(name);
   const value = Number.parseInt(raw, 10);
@@ -32202,12 +32224,35 @@ async function run() {
   }
 
   core.info(`Fetching GitHub data for ${username}`);
-
-  const [{ contributions, calendar }, recentActivity, repositories] = await Promise.all([
+  const [contributionsResult, activityResult, reposResult] = await Promise.allSettled([
     fetchContributions(username, token),
     fetchActivity(username, token, maxActivities),
     fetchRepos(username, token, maxRepos),
   ]);
+
+  const { contributions, calendar } =
+    contributionsResult.status === 'fulfilled'
+      ? contributionsResult.value
+      : { contributions: EMPTY_CONTRIBUTIONS, calendar: EMPTY_CALENDAR };
+  if (contributionsResult.status === 'rejected') {
+    core.warning(`Contributions fetch failed; using empty contributions. ${contributionsResult.reason?.message ?? contributionsResult.reason}`);
+  }
+
+  const recentActivity =
+    activityResult.status === 'fulfilled'
+      ? activityResult.value
+      : [];
+  if (activityResult.status === 'rejected') {
+    core.warning(`Activity fetch failed; using empty activity list. ${activityResult.reason?.message ?? activityResult.reason}`);
+  }
+
+  const repositories =
+    reposResult.status === 'fulfilled'
+      ? reposResult.value
+      : [];
+  if (reposResult.status === 'rejected') {
+    core.warning(`Repository fetch failed; using empty repositories list. ${reposResult.reason?.message ?? reposResult.reason}`);
+  }
 
   const streak = calculateStreak(calendar);
   const stats = calculateStats(calendar, recentActivity);
