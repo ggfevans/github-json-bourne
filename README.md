@@ -1,5 +1,5 @@
 # GitHub JSON Bourne
-
+ 
 [![CI](https://github.com/ggfevans/github-json-bourne/actions/workflows/ci.yml/badge.svg)](https://github.com/ggfevans/github-json-bourne/actions/workflows/ci.yml)
 
 Your GitHub profile as structured JSON. Contributions, streaks, activity, repos — one action, one file, zero fuss.
