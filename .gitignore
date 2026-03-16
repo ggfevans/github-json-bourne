@@ -1,3 +1,16 @@
+# macOS
+.DS_Store
+
+# Dependencies
 node_modules/
-docs/
-.planning/
+
+# Intermediate files
+/tmp-*
+*.tmp
+
+# Design docs and plans
+/docs/
+/.planning/
+
+# Worktrees
+/.worktrees/
