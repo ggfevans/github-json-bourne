@@ -1,0 +1,93 @@
+name: Integration Test
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 0 * * 0' # Sunday midnight UTC
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash -euo pipefail {0}
+
+jobs:
+  integration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - id: run-action
+        uses: ./
+
+      - name: Validate output JSON
+        run: |
+          JSON_PATH="${{ steps.run-action.outputs.json-path }}"
+
+          if [[ ! -f "$JSON_PATH" ]]; then
+            echo "FAIL: Output file not found at $JSON_PATH"
+            exit 1
+          fi
+          echo "PASS: Output file exists at $JSON_PATH"
+
+          # Check valid JSON
+          if ! jq empty "$JSON_PATH" 2>/dev/null; then
+            echo "FAIL: File is not valid JSON"
+            exit 1
+          fi
+          echo "PASS: Valid JSON"
+
+          # Check all 7 top-level keys exist
+          EXPECTED_KEYS='["calendar","contributions","lastUpdated","recentActivity","repositories","stats","streak"]'
+          ACTUAL_KEYS=$(jq -c 'keys' "$JSON_PATH")
+          if [[ "$ACTUAL_KEYS" != "$EXPECTED_KEYS" ]]; then
+            echo "FAIL: Top-level keys mismatch"
+            echo "  expected: $EXPECTED_KEYS"
+            echo "  actual:   $ACTUAL_KEYS"
+            exit 1
+          fi
+          echo "PASS: All 7 top-level keys present"
+
+          # Check contributions.total is a non-negative number
+          TOTAL=$(jq '.contributions.total' "$JSON_PATH")
+          if ! [[ "$TOTAL" =~ ^[0-9]+$ ]]; then
+            echo "FAIL: contributions.total is not a non-negative integer (got: $TOTAL)"
+            exit 1
+          fi
+          echo "PASS: contributions.total = $TOTAL"
+
+          # Check repositories is an array
+          IS_ARRAY=$(jq '.repositories | type' "$JSON_PATH")
+          if [[ "$IS_ARRAY" != '"array"' ]]; then
+            echo "FAIL: repositories is not an array (got type: $IS_ARRAY)"
+            exit 1
+          fi
+          REPO_COUNT=$(jq '.repositories | length' "$JSON_PATH")
+          echo "PASS: repositories is an array ($REPO_COUNT items)"
+
+          # Check streak.current and streak.longest are numbers
+          for FIELD in current longest; do
+            VAL=$(jq ".streak.$FIELD" "$JSON_PATH")
+            if ! [[ "$VAL" =~ ^[0-9]+$ ]]; then
+              echo "FAIL: streak.$FIELD is not a non-negative integer (got: $VAL)"
+              exit 1
+            fi
+            echo "PASS: streak.$FIELD = $VAL"
+          done
+
+          # Check lastUpdated is a valid ISO 8601 timestamp
+          LAST_UPDATED=$(jq -r '.lastUpdated' "$JSON_PATH")
+          if ! [[ "$LAST_UPDATED" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2} ]]; then
+            echo "FAIL: lastUpdated is not a valid ISO timestamp (got: $LAST_UPDATED)"
+            exit 1
+          fi
+          echo "PASS: lastUpdated = $LAST_UPDATED"
+
+          echo ""
+          echo "All validation checks passed."
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: github-json-output
+          path: ${{ steps.run-action.outputs.json-path }}
