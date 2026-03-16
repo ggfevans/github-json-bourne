@@ -8,7 +8,7 @@ Open a [GitHub issue](https://github.com/ggfevans/github-json-bourne/issues/new)
 
 - What you expected to happen
 - What actually happened
-- Your workflow configuration (redact your token if you prefer)
+- Your workflow configuration (remove or mask all secrets and tokens before posting)
 - Any relevant log output from the action run
 
 ## Suggesting Features
