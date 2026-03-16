@@ -4,23 +4,36 @@
 
 | Version | Supported |
 |---------|-----------|
-| 1.0.x   | Yes       |
-| < 1.0   | No        |
+| 0.1.x   | Yes       |
+| < 0.1   | No        |
+
+Only the latest release is actively supported with security fixes.
 
 ## Reporting a Vulnerability
 
-Do not open public issues. Email the maintainer or use GitHub's private vulnerability reporting.
+**Do not open a public issue for security vulnerabilities.**
 
-## Automated Security Controls
+Instead, please report them through GitHub's private security advisory feature:
 
-- GitHub Actions are pinned to full commit SHAs.
-- Dependabot tracks GitHub Actions updates weekly (`.github/dependabot.yml`).
-- CI runs ShellCheck with `severity: error` for all scripts in `scripts/`.
-- CI blocks insecure shell patterns (`http://` URLs and `curl --insecure` / `curl -k`).
+1. Go to the [Security Advisories page](https://github.com/ggfevans/github-json-bourne/security/advisories)
+2. Click **"New draft security advisory"**
+3. Fill in the details of the vulnerability
 
-## Security Considerations
+You should receive an initial response within 72 hours. If the vulnerability is confirmed, a fix will be developed privately and released as a patch before the advisory is made public.
 
-- Trakt Client ID is safe for logs (public API access).
-- TMDB API key should be kept secret.
-- Output paths are validated to stay within the workspace boundary.
-- Runtime scripts are shell-based and rely only on tools available on GitHub-hosted runners (`bash`, `curl`, `jq`).
+## Scope
+
+This action runs as a Node.js GitHub Action. It makes authenticated HTTP requests to the GitHub API and writes a JSON file to the caller's repository.
+
+Security-relevant areas include:
+
+- **Token handling** -- the GitHub token is passed as a secret and never logged
+- **Input validation** -- all action inputs are validated before use
+- **Path traversal** -- the output path is validated against the workspace
+- **Dependency management** -- dependencies are bundled via ncc and audited regularly
+
+## Out of Scope
+
+- Vulnerabilities in the GitHub API itself
+- Vulnerabilities in GitHub Actions runner infrastructure
+- Issues requiring the caller to have already misconfigured their workflow permissions

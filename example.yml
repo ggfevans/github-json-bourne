@@ -1,0 +1,26 @@
+# .github/workflows/github-profile.yml
+#
+# Fetches your GitHub profile data and commits it as JSON.
+# Runs daily and on manual trigger.
+
+name: Update GitHub Data
+
+on:
+  schedule:
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Fetch GitHub data
+        uses: ggfevans/github-json-bourne@main
+        with:
+          username: ${{ github.repository_owner }}
+          token: ${{ secrets.GITHUB_TOKEN }}
