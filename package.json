@@ -8,7 +8,7 @@
     "test": "node --test src/__tests__/*.test.js"
   },
   "dependencies": {
-    "@actions/core": "^1.11.1",
+    "@actions/core": "^3.0.0",
     "@octokit/graphql": "^8.2.1",
     "@octokit/rest": "^21.1.1"
   },
