@@ -39,5 +39,5 @@ outputs:
     description: 'ISO timestamp of when data was fetched'
 
 runs:
-  using: 'node25'
+  using: 'node20'
   main: 'dist/index.js'
